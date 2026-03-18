@@ -1,0 +1,17 @@
+# Private keys and certificates — never commit these
+private_key.pem
+*.key
+*.p12
+*.pfx
+
+# Certificates with actual private material
+certificate.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp

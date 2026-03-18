@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Berlin Group AIS — Consent Flow Visualizer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1923;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 28px 20px;
+    }
+
+    .container { max-width: 940px; margin: 0 auto; }
+
+    .header {
+      display: flex; align-items: flex-start;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #2d4060;
+      margin-bottom: 28px;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header p  { font-size: 12px; color: #6b829e; margin-top: 4px; }
+    .tag {
+      display: inline-block;
+      background: #1e3a5f; color: #4d9ef7;
+      font-size: 10px; font-weight: 700; letter-spacing: .5px;
+      padding: 2px 7px; border-radius: 4px; margin-right: 5px;
+    }
+
+    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #1a2535; border: 1px solid #2d4060;
+      border-radius: 10px; overflow: hidden;
+    }
+    .card-head {
+      padding: 12px 16px; border-bottom: 1px solid #2d4060;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px; color: #6b829e;
+    }
+    .card-body { padding: 16px; }
+
+    /* ── Generate demo keys button ── */
+    .gen-btn {
+      padding: 3px 10px; background: #243044; border: 1px solid #2d4060;
+      border-radius: 5px; color: #8899aa; font-size: 10px; font-weight: 600;
+      cursor: pointer; transition: all .2s; text-transform: none; letter-spacing: 0;
+    }
+    .gen-btn:hover:not(:disabled) { background: #2d4060; color: #e2e8f0; }
+    .gen-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Config ── */
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: #4d6080;
+      margin: 16px 0 10px; padding-top: 14px;
+      border-top: 1px solid #243044;
+    }
+    .section-label:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+    .field { margin-bottom: 12px; }
+    .field:last-child { margin-bottom: 0; }
+    label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: #8899aa; margin-bottom: 5px;
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    input[type=text], input[type=url], textarea {
+      width: 100%; background: #0f1923; border: 1px solid #2d4060;
+      border-radius: 6px; padding: 8px 10px;
+      font-size: 12px; font-family: 'Consolas','Monaco',monospace;
+      color: #e2e8f0; outline: none;
+      transition: border-color .2s; resize: vertical;
+    }
+    input[type=text]:focus, input[type=url]:focus, textarea:focus { border-color: #2563eb; }
+
+    /* ── PEM key loaders ── */
+    .pem-field { margin-bottom: 12px; }
+    .pem-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    }
+    .pem-name { font-size: 11px; font-weight: 600; color: #8899aa; flex: 1;
+      text-transform: uppercase; letter-spacing: .4px; }
+    .pem-status {
+      font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 10px;
+      background: #1a2535; color: #4d6080; border: 1px solid #243044;
+    }
+    .pem-status.ok { background: #1a3a2a; color: #4caf7d; border-color: #2d7a50; }
+    .file-label {
+      padding: 4px 10px; background: #243044; border: 1px solid #2d4060;
+      border-radius: 5px; font-size: 11px; color: #8899aa;
+      cursor: pointer; white-space: nowrap; transition: all .2s;
+    }
+    .file-label:hover { background: #2d4060; color: #e2e8f0; }
+    .file-label input { display: none; }
+    .pem-textarea {
+      width: 100%; background: #0f1923; border: 1px solid #2d4060;
+      border-radius: 6px; padding: 8px 10px;
+      font-size: 10px; font-family: 'Consolas','Monaco',monospace;
+      color: #6b829e; outline: none; resize: vertical;
+      transition: border-color .2s, color .2s;
+    }
+    .pem-textarea:focus { border-color: #2563eb; color: #e2e8f0; }
+    .pem-textarea.loaded { border-color: #2d7a50; color: #4caf7d; }
+
+    /* ── Buttons ── */
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+    .btn {
+      padding: 10px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background .2s, opacity .2s;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary   { background: #2563eb; color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: #3b82f6; }
+    .btn-secondary { background: #243044; color: #8899aa; border: 1px solid #2d4060; }
+    .btn-secondary:hover:not(:disabled){ background: #2d4060; color: #e2e8f0; }
+    .btn-secondary.active-mode { background: #1e3a5f; color: #4d9ef7; border-color: #2563eb; }
+
+    /* ── Architecture ── */
+    .arch {
+      display: flex; align-items: center;
+      padding: 14px 16px; border-bottom: 1px solid #2d4060;
+      overflow-x: auto; gap: 0;
+    }
+    .arch-box {
+      background: #243044; border: 1px solid #2d4060;
+      border-radius: 7px; padding: 9px 14px;
+      text-align: center; flex-shrink: 0; min-width: 110px;
+    }
+    .arch-box.hl { border-color: #2563eb; background: #1e3a5f; }
+    .arch-box .bt { font-size: 12px; font-weight: 600; }
+    .arch-box .bs { font-size: 10px; color: #6b829e; margin-top: 2px; }
+    .arch-arrow {
+      flex: 1; min-width: 60px;
+      display: flex; flex-direction: column; align-items: center; padding: 0 6px;
+      overflow: hidden;
+    }
+    .arrow-lbl { font-size: 9px; color: #4d9ef7; margin-bottom: 3px; text-align: center; width: 100%; }
+    .arrow-ln  { width: 100%; height: 1px; background: #2d4060; position: relative; }
+    .arrow-ln::after {
+      content: '▶'; position: absolute; right: -5px; top: -7px;
+      font-size: 9px; color: #4d6080;
+    }
+
+    /* ── Steps ── */
+    .steps { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; }
+
+    .step {
+      background: #0f1923; border: 1px solid #243044;
+      border-left: 3px solid #243044; border-radius: 7px;
+      transition: border-left-color .3s; overflow: hidden;
+    }
+    .step.active { border-left-color: #4d9ef7; }
+    .step.done   { border-left-color: #4caf7d; }
+
+    .step-hd {
+      display: flex; align-items: center;
+      padding: 10px 12px; gap: 10px; cursor: pointer;
+    }
+    .step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #1a2535; border: 1px solid #2d4060;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #6b829e;
+      flex-shrink: 0; transition: all .3s;
+    }
+    .step.active .step-num { background: #1e3a5f; border-color: #4d9ef7; color: #4d9ef7; }
+    .step.done   .step-num { background: #1a3a2a; border-color: #4caf7d; color: #4caf7d; }
+    .step.done   .step-num::before { content: '✓'; }
+    .step.done   .num-inner { display: none; }
+
+    .step-info { flex: 1; }
+    .step-title { font-size: 13px; font-weight: 600; }
+    .step-sub   { font-size: 11px; color: #6b829e; margin-top: 2px; }
+
+    .step-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .b-pending { background: #1a2535; color: #4d6080; border: 1px solid #243044; }
+    .b-active  { background: #1e3a5f; color: #4d9ef7; border: 1px solid #2563eb; }
+    .b-done    { background: #1a3a2a; color: #4caf7d; border: 1px solid #2d7a50; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .step.active .step-badge { animation: pulse 1.2s ease-in-out infinite; }
+
+    .step-detail {
+      display: none; padding: 0 12px 12px;
+      border-top: 1px solid #1a2535;
+    }
+    .step-detail.show { display: block; }
+    .kv-grid { display: grid; gap: 6px; margin-top: 10px; }
+    .kv { background: #1a2535; border: 1px solid #243044; border-radius: 5px; padding: 8px 10px; }
+    .kv-k { font-size: 10px; font-weight: 700; color: #6b829e; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 3px; }
+    .kv-v { font-size: 11px; font-family: 'Consolas','Monaco',monospace; color: #e2e8f0; word-break: break-all; white-space: pre-wrap; }
+    .kv-v.blue  { color: #4d9ef7; }
+    .kv-v.green { color: #4caf7d; }
+    .kv-v.yellow{ color: #f0b429; }
+
+    /* ── Next Step bar ── */
+    .next-bar {
+      display: none; padding: 12px 16px;
+      border-top: 1px solid #2d4060; background: #131e2d;
+    }
+    .next-bar.show { display: flex; align-items: center; gap: 12px; }
+    .next-bar-label { font-size: 12px; color: #6b829e; flex: 1; }
+    .next-bar-label strong { color: #e2e8f0; }
+    #nextBtn {
+      padding: 8px 20px; background: #2563eb; color: #fff;
+      border: none; border-radius: 7px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background .2s; white-space: nowrap;
+    }
+    #nextBtn:hover { background: #3b82f6; }
+    .progress-dots { display: flex; gap: 4px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #243044; transition: background .3s; }
+    .dot.done   { background: #4caf7d; }
+    .dot.active { background: #4d9ef7; }
+
+    /* ── Curl output ── */
+    .curl-wrap { display: none; border-top: 1px solid #2d4060; padding: 16px; }
+    .curl-wrap.show { display: block; }
+    .curl-title {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .curl-title span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b829e; }
+    .copy-btn {
+      padding: 4px 12px; background: #243044; border: 1px solid #2d4060;
+      border-radius: 5px; color: #8899aa; font-size: 11px;
+      cursor: pointer; transition: all .2s;
+    }
+    .copy-btn:hover { background: #2d4060; color: #e2e8f0; }
+
+    pre#curlOut {
+      background: #0f1923; border: 1px solid #243044; border-radius: 7px;
+      padding: 14px; font-family: 'Consolas','Monaco',monospace;
+      font-size: 11px; line-height: 1.7; white-space: pre-wrap;
+      word-break: break-all; color: #e2e8f0;
+      max-height: 380px; overflow-y: auto;
+    }
+    .c-cmd  { color: #4d9ef7; font-weight: 700; }
+    .c-flag { color: #c792ea; }
+    .c-url  { color: #f0a030; }
+    .c-key  { color: #4caf7d; }
+    .c-val  { color: #e2e8f0; }
+    .c-ph   { color: #e05c5c; font-style: italic; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #1a2535; }
+    ::-webkit-scrollbar-thumb { background: #2d4060; border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div>
+      <h1><span class="tag">PSD2</span><span class="tag">Berlin Group v1.3</span>AIS Consent Flow</h1>
+      <p>Visualize the TPP &rarr; ASPSP signed consent creation — generates a ready-to-run curl command</p>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- Left: Config -->
+    <div>
+      <div class="card">
+        <div class="card-head">Configuration</div>
+        <div class="card-body">
+
+          <!-- Keys -->
+          <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+            Keys &amp; Certificate
+            <button id="genBtn" class="gen-btn" onclick="generateDemoKeys()">Generate demo keys</button>
+          </div>
+
+          <div class="pem-field">
+            <div class="pem-row">
+              <span class="pem-name">Private Key (PEM)</span>
+              <span class="pem-status" id="pk-status">Not loaded</span>
+              <label class="file-label">Load file
+                <input type="file" accept=".pem,.key,.txt" onchange="loadPemFile('pk', this)">
+              </label>
+            </div>
+            <textarea class="pem-textarea" id="pk-text" rows="3"
+              placeholder="Paste -----BEGIN PRIVATE KEY----- ..."
+              oninput="onPemInput('pk')"></textarea>
+          </div>
+
+          <div class="pem-field">
+            <div class="pem-row">
+              <span class="pem-name">Certificate (PEM)</span>
+              <span class="pem-status" id="cert-status">Not loaded</span>
+              <label class="file-label">Load file
+                <input type="file" accept=".pem,.crt,.cer,.txt" onchange="loadPemFile('cert', this)">
+              </label>
+            </div>
+            <textarea class="pem-textarea" id="cert-text" rows="3"
+              placeholder="Paste -----BEGIN CERTIFICATE----- ..."
+              oninput="onPemInput('cert')"></textarea>
+          </div>
+
+          <!-- Request config -->
+          <div class="section-label">Request</div>
+
+          <div class="field">
+            <label>Endpoint</label>
+            <input type="text" id="cfg-endpoint" value="https://apisandbox.openbankproject.com//berlin-group/v1.3/consents">
+          </div>
+
+          <div class="field">
+            <label>Key ID</label>
+            <input type="text" id="cfg-keyid" value="SN=1082, CA=CN=MAIB Prisacaru Sergiu (Test), O=MAIB">
+          </div>
+
+          <!-- PSU -->
+          <div class="section-label">PSU Details</div>
+
+          <div class="field">
+            <label>Device ID</label>
+            <input type="text" id="cfg-device-id" value="device-1234567890">
+          </div>
+          <div class="field">
+            <label>Device Name</label>
+            <input type="text" id="cfg-device-name" value="Kalina-PC">
+          </div>
+          <div class="field">
+            <label>IP Address</label>
+            <input type="text" id="cfg-ip" value="192.168.1.42">
+          </div>
+          <div class="field">
+            <label>TPP Redirect URI</label>
+            <input type="text" id="cfg-redirect" value="tppapp://example.com/redirect">
+          </div>
+          <div class="field">
+            <label>TPP Nok Redirect URI</label>
+            <input type="text" id="cfg-nok" value="https://example.com/redirect">
+          </div>
+
+          <!-- Body -->
+          <div class="section-label">Consent Body</div>
+
+          <div class="field">
+            <textarea id="cfg-body" rows="7">{
+  "access": {
+    "availableAccounts": "allAccounts"
+  },
+  "recurringIndicator": false,
+  "validUntil": "2027-01-01",
+  "frequencyPerDay": 1
+}</textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary"   id="autoBtn" onclick="runFlow('auto')">Auto Run</button>
+            <button class="btn btn-secondary" id="stepBtn" onclick="runFlow('manual')">Step by Step</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Flow + Curl -->
+    <div>
+      <div class="card">
+
+        <div class="arch">
+          <div class="arch-box hl">
+            <div class="bt">Your App (TPP)</div>
+            <div class="bs">Third Party Provider</div>
+          </div>
+          <div class="arch-arrow">
+            <div class="arrow-lbl">POST /consents + Signature</div>
+            <div class="arrow-ln"></div>
+          </div>
+          <div class="arch-box">
+            <div class="bt">OBP Sandbox</div>
+            <div class="bs">ASPSP (Bank)</div>
+          </div>
+          <div class="arch-arrow">
+            <div class="arrow-lbl">consentId + SCA link</div>
+            <div class="arrow-ln"></div>
+          </div>
+          <div class="arch-box">
+            <div class="bt">PSU Browser</div>
+            <div class="bs">Authorise consent</div>
+          </div>
+        </div>
+
+        <div class="steps">
+
+          <div class="step" id="step-1">
+            <div class="step-hd" onclick="toggle(1)">
+              <div class="step-num"><span class="num-inner">1</span></div>
+              <div class="step-info">
+                <div class="step-title">Generate Request Identity</div>
+                <div class="step-sub">Unique request ID (UUID) + current Date header</div>
+              </div>
+              <span class="step-badge b-pending" id="badge-1">Pending</span>
+            </div>
+            <div class="step-detail" id="detail-1"></div>
+          </div>
+
+          <div class="step" id="step-2">
+            <div class="step-hd" onclick="toggle(2)">
+              <div class="step-num"><span class="num-inner">2</span></div>
+              <div class="step-info">
+                <div class="step-title">Compute Body Digest</div>
+                <div class="step-sub">SHA-256 hash of the request body (SubtleCrypto)</div>
+              </div>
+              <span class="step-badge b-pending" id="badge-2">Pending</span>
+            </div>
+            <div class="step-detail" id="detail-2"></div>
+          </div>
+
+          <div class="step" id="step-3">
+            <div class="step-hd" onclick="toggle(3)">
+              <div class="step-num"><span class="num-inner">3</span></div>
+              <div class="step-info">
+                <div class="step-title">Build Signing String</div>
+                <div class="step-sub">Compose the string to sign: digest + date + x-request-id</div>
+              </div>
+              <span class="step-badge b-pending" id="badge-3">Pending</span>
+            </div>
+            <div class="step-detail" id="detail-3"></div>
+          </div>
+
+          <div class="step" id="step-4">
+            <div class="step-hd" onclick="toggle(4)">
+              <div class="step-num"><span class="num-inner">4</span></div>
+              <div class="step-info">
+                <div class="step-title">Sign with RSA-SHA256</div>
+                <div class="step-sub">Private key signs the string — produces base64 signature</div>
+              </div>
+              <span class="step-badge b-pending" id="badge-4">Pending</span>
+            </div>
+            <div class="step-detail" id="detail-4"></div>
+          </div>
+
+          <div class="step" id="step-5">
+            <div class="step-hd" onclick="toggle(5)">
+              <div class="step-num"><span class="num-inner">5</span></div>
+              <div class="step-info">
+                <div class="step-title">Assemble Headers</div>
+                <div class="step-sub">Signature, Digest, TPP-Certificate, PSU headers</div>
+              </div>
+              <span class="step-badge b-pending" id="badge-5">Pending</span>
+            </div>
+            <div class="step-detail" id="detail-5"></div>
+          </div>
+
+        </div>
+
+        <!-- Next Step bar (manual mode) -->
+        <div class="next-bar" id="nextBar">
+          <div class="progress-dots">
+            <div class="dot" id="dot-1"></div>
+            <div class="dot" id="dot-2"></div>
+            <div class="dot" id="dot-3"></div>
+            <div class="dot" id="dot-4"></div>
+            <div class="dot" id="dot-5"></div>
+          </div>
+          <div class="next-bar-label" id="nextLabel">Ready</div>
+          <button id="nextBtn" onclick="advance()">Next Step &rarr;</button>
+        </div>
+
+        <!-- Curl output -->
+        <div class="curl-wrap" id="curlWrap">
+          <div class="curl-title">
+            <span>Generated curl Command</span>
+            <button class="copy-btn" onclick="copyCurl()">Copy</button>
+          </div>
+          <pre id="curlOut"></pre>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── PEM state ──
+  const pem = { pk: null, cert: null };
+
+  function loadPemFile(type, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById(type + '-text').value = e.target.result;
+      setPem(type, e.target.result);
+    };
+    reader.readAsText(file);
+  }
+
+  function onPemInput(type) {
+    setPem(type, document.getElementById(type + '-text').value);
+  }
+
+  function setPem(type, content) {
+    const keyword = type === 'pk' ? 'PRIVATE KEY' : 'CERTIFICATE';
+    const ok = content.includes('BEGIN ' + keyword);
+    pem[type] = ok ? content : null;
+    const statusEl = document.getElementById(type + '-status');
+    statusEl.textContent = ok ? 'Loaded' : 'Not loaded';
+    statusEl.className   = 'pem-status' + (ok ? ' ok' : '');
+    const ta = document.getElementById(type + '-text');
+    ta.className = 'pem-textarea' + (ok ? ' loaded' : '');
+  }
+
+  // ── PEM helpers ──
+  function pemToDer(pemStr, label) {
+    const re = new RegExp(`-----BEGIN ${label}-----([\\s\\S]*?)-----END ${label}-----`);
+    const m  = pemStr.match(re);
+    if (!m) throw new Error(`No "${label}" block found`);
+    const b64 = m[1].replace(/\s/g, '');
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  }
+
+  // Base64-encode the full PEM text (matches Node's Buffer.from(pem).toString('base64'))
+  function pemToBase64Header(pemStr) {
+    const enc   = new TextEncoder();
+    const bytes = enc.encode(pemStr);
+    let bin = '';
+    bytes.forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin);
+  }
+
+  async function rsaSign(privateKeyPem, message) {
+    const der = pemToDer(privateKeyPem, 'PRIVATE KEY');
+    const key = await crypto.subtle.importKey(
+      'pkcs8', der,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false, ['sign']
+    );
+    const enc    = new TextEncoder();
+    const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, enc.encode(message));
+    const arr    = new Uint8Array(sigBuf);
+    return btoa(arr.reduce((s, b) => s + String.fromCharCode(b), ''));
+  }
+
+  // ── Manual mode ──
+  const STEP_NAMES = [
+    'Generate Request Identity',
+    'Compute Body Digest',
+    'Build Signing String',
+    'Sign with RSA-SHA256',
+    'Assemble Headers',
+  ];
+
+  let _resolver = null;
+  function waitForUser() { return new Promise(r => { _resolver = r; }); }
+  function advance()     { if (_resolver) { _resolver(); _resolver = null; } }
+
+  // ── Step UI ──
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  function cfg(id) { return document.getElementById(id).value.trim(); }
+
+  function setActive(n) {
+    document.getElementById('step-' + n).className = 'step active';
+    const b = document.getElementById('badge-' + n);
+    b.className = 'step-badge b-active';
+    b.textContent = 'Running\u2026';
+  }
+
+  function setDone(n, data) {
+    document.getElementById('step-' + n).className = 'step done';
+    const b = document.getElementById('badge-' + n);
+    b.className = 'step-badge b-done';
+    b.textContent = 'Done';
+    if (data) {
+      let html = '<div class="kv-grid">';
+      for (const [k, v] of Object.entries(data)) {
+        const cls = (v && v.cls) || '';
+        const str = (v && v.val !== undefined) ? v.val : String(v);
+        html += `<div class="kv"><div class="kv-k">${esc(k)}</div><div class="kv-v ${cls}">${esc(str)}</div></div>`;
+      }
+      html += '</div>';
+      const d = document.getElementById('detail-' + n);
+      d.innerHTML = html;
+      d.classList.add('show');
+    }
+  }
+
+  function toggle(n) {
+    const d = document.getElementById('detail-' + n);
+    if (d.innerHTML) d.classList.toggle('show');
+  }
+
+  function updateDot(n, state) {
+    document.getElementById('dot-' + n).className = 'dot ' + state;
+  }
+
+  function setNextBar(idx) {
+    const bar   = document.getElementById('nextBar');
+    const label = document.getElementById('nextLabel');
+    const btn   = document.getElementById('nextBtn');
+    if (idx === 0) { bar.classList.remove('show'); return; }
+    bar.classList.add('show');
+    if (idx <= 5) {
+      label.innerHTML = `Step ${idx}/5 &mdash; <strong>${STEP_NAMES[idx - 1]}</strong>`;
+      btn.textContent = 'Run Step \u2192';
+    } else {
+      label.innerHTML = '<strong>All steps complete</strong> &mdash; ready to generate curl';
+      btn.textContent = 'Generate curl \u2192';
+    }
+  }
+
+  function reset() {
+    _resolver = null;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById('step-' + i).className = 'step';
+      const b = document.getElementById('badge-' + i);
+      b.className = 'step-badge b-pending'; b.textContent = 'Pending';
+      const d = document.getElementById('detail-' + i);
+      d.innerHTML = ''; d.classList.remove('show');
+      updateDot(i, '');
+    }
+    document.getElementById('curlWrap').classList.remove('show');
+    document.getElementById('curlOut').innerHTML = '';
+    document.getElementById('nextBar').classList.remove('show');
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function sha256base64(str) {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+    const arr = Array.from(new Uint8Array(buf));
+    return btoa(arr.map(b => String.fromCharCode(b)).join(''));
+  }
+
+  // ── Main flow ──
+  async function runFlow(mode) {
+    const autoBtn = document.getElementById('autoBtn');
+    const stepBtn = document.getElementById('stepBtn');
+    autoBtn.disabled = true; stepBtn.disabled = true;
+    if (mode === 'manual') stepBtn.classList.add('active-mode');
+    reset();
+
+    const endpoint    = cfg('cfg-endpoint');
+    const keyId       = cfg('cfg-keyid');
+    const deviceId    = cfg('cfg-device-id');
+    const deviceName  = cfg('cfg-device-name');
+    const psuIp       = cfg('cfg-ip');
+    const redirectUri = cfg('cfg-redirect');
+    const nokUri      = cfg('cfg-nok');
+    const body        = cfg('cfg-body');
+    const hasPk       = !!pem.pk;
+    const hasCert     = !!pem.cert;
+
+    if (mode === 'manual') { setNextBar(1); await waitForUser(); }
+
+    // Step 1 — Identity
+    updateDot(1, 'active'); setActive(1);
+    await delay(mode === 'auto' ? 500 : 80);
+    const requestId  = crypto.randomUUID();
+    const dateHeader = new Date().toUTCString();
+    setDone(1, { 'X-Request-ID': requestId, 'Date': dateHeader });
+    updateDot(1, 'done');
+
+    if (mode === 'manual') { setNextBar(2); await waitForUser(); } else await delay(350);
+
+    // Step 2 — Digest
+    updateDot(2, 'active'); setActive(2);
+    await delay(mode === 'auto' ? 600 : 80);
+    const digestB64    = await sha256base64(body);
+    const digestHeader = `SHA-256=${digestB64}`;
+    setDone(2, {
+      'Input':            body,
+      'SHA-256 (base64)': { val: digestB64,    cls: 'blue'  },
+      'Digest Header':    { val: digestHeader, cls: 'green' },
+    });
+    updateDot(2, 'done');
+
+    if (mode === 'manual') { setNextBar(3); await waitForUser(); } else await delay(350);
+
+    // Step 3 — Signing string
+    updateDot(3, 'active'); setActive(3);
+    await delay(mode === 'auto' ? 400 : 80);
+    const signingString = `digest: ${digestHeader}\ndate: ${dateHeader}\nx-request-id: ${requestId}`;
+    setDone(3, {
+      'Covers':        'digest · date · x-request-id',
+      'Signing String': { val: signingString, cls: 'blue' },
+    });
+    updateDot(3, 'done');
+
+    if (mode === 'manual') { setNextBar(4); await waitForUser(); } else await delay(350);
+
+    // Step 4 — Sign
+    updateDot(4, 'active'); setActive(4);
+    await delay(mode === 'auto' ? 700 : 80);
+
+    let realSignature   = null;
+    let signatureDetail = {};
+
+    if (hasPk) {
+      try {
+        realSignature = await rsaSign(pem.pk, signingString);
+        signatureDetail = {
+          'Key ID':    keyId,
+          'Algorithm': 'RSA-SHA256 (PKCS#1 v1.5)',
+          'Signature': { val: realSignature.substring(0, 64) + '\u2026', cls: 'green' },
+        };
+      } catch (e) {
+        signatureDetail = {
+          'Error': { val: e.message, cls: 'yellow' },
+          'Note':  'Falling back to placeholder',
+        };
+      }
+    } else {
+      signatureDetail = {
+        'Key ID':    keyId,
+        'Algorithm': 'RSA-SHA256 (PKCS#1 v1.5)',
+        'Signature': { val: 'Load private_key.pem to compute the real signature', cls: 'yellow' },
+      };
+    }
+    setDone(4, signatureDetail);
+    updateDot(4, 'done');
+
+    if (mode === 'manual') { setNextBar(5); await waitForUser(); } else await delay(350);
+
+    // Step 5 — Assemble headers
+    updateDot(5, 'active'); setActive(5);
+    await delay(mode === 'auto' ? 400 : 80);
+
+    const sigValue       = realSignature || '<RSA-SHA256-SIGNATURE>';
+    const signatureHeader = `keyId="${keyId}", algorithm="rsa-sha256", headers="digest date x-request-id", signature="${sigValue}"`;
+    const certB64         = hasCert ? pemToBase64Header(pem.cert) : null;
+
+    setDone(5, {
+      'Content-Type':              'application/json',
+      'Date':                      dateHeader,
+      'X-Request-ID':              requestId,
+      'Digest':                    digestHeader,
+      'Signature (truncated)':     signatureHeader.substring(0, 80) + '\u2026',
+      'TPP-Signature-Certificate': hasCert
+        ? { val: certB64.substring(0, 40) + '\u2026 (real)', cls: 'green' }
+        : { val: 'Load certificate.pem to include real value', cls: 'yellow' },
+      'PSU-Device-ID':    deviceId,
+      'PSU-Device-Name':  deviceName,
+      'PSU-IP-Address':   psuIp,
+      'TPP-Redirect-URI': redirectUri,
+      'TPP-Nok-Redirect-URI': nokUri,
+    });
+    updateDot(5, 'done');
+
+    if (mode === 'manual') { setNextBar(6); await waitForUser(); } else await delay(300);
+    document.getElementById('nextBar').classList.remove('show');
+
+    // Curl
+    const certDisplay = certB64 || '<BASE64-CERTIFICATE>';
+    const sigDisplay  = realSignature || '<RSA-SHA256-SIGNATURE>';
+    const certCls     = certB64      ? 'c-val' : 'c-ph';
+    const sigCls      = realSignature ? 'c-val' : 'c-ph';
+
+    const lines = [
+      `<span class="c-cmd">curl</span> <span class="c-flag">-i -X POST</span> <span class="c-url">'${esc(endpoint)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'Content-Type:</span> <span class="c-val">application/json'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'Date:</span> <span class="c-val">${esc(dateHeader)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'X-Request-ID:</span> <span class="c-val">${requestId}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'Digest:</span> <span class="c-val">${esc(digestHeader)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'Signature:</span> <span class="c-val">keyId="${esc(keyId)}", algorithm="rsa-sha256", headers="digest date x-request-id", signature="</span><span class="${sigCls}">${esc(sigDisplay)}</span><span class="c-val">"'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'TPP-Signature-Certificate:</span> <span class="${certCls}">${esc(certDisplay)}</span><span class="c-val">'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'PSU-Device-ID:</span> <span class="c-val">${esc(deviceId)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'PSU-Device-Name:</span> <span class="c-val">${esc(deviceName)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'PSU-IP-Address:</span> <span class="c-val">${esc(psuIp)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'TPP-Redirect-URI:</span> <span class="c-val">${esc(redirectUri)}'</span> \\`,
+      `  <span class="c-flag">-H</span> <span class="c-key">'TPP-Nok-Redirect-URI:</span> <span class="c-val">${esc(nokUri)}'</span> \\`,
+      `  <span class="c-flag">-d</span> <span class="c-val">'${esc(body)}'</span>`,
+    ];
+    document.getElementById('curlOut').innerHTML = lines.join('\n');
+    document.getElementById('curlWrap').classList.add('show');
+
+    autoBtn.disabled = false; stepBtn.disabled = false;
+    stepBtn.classList.remove('active-mode');
+  }
+
+  // ── Demo key generation ──
+
+  // Minimal DER / ASN.1 helpers
+  const derLen = n => {
+    if (n < 0x80) return [n];
+    const b = []; let x = n;
+    while (x > 0) { b.unshift(x & 0xff); x >>= 8; }
+    return [0x80 | b.length, ...b];
+  };
+  const derTag  = (t, c) => new Uint8Array([t, ...derLen(c.length), ...c]);
+  const derSeq  = c  => derTag(0x30, c);
+  const derSet  = c  => derTag(0x31, c);
+  const derOid  = h  => derTag(0x06, new Uint8Array(h.match(/.{2}/g).map(x => parseInt(x,16))));
+  const derNull = () => new Uint8Array([0x05, 0x00]);
+  const derBits = c  => derTag(0x03, new Uint8Array([0x00, ...c]));
+  const derPrint= s  => derTag(0x13, new Uint8Array([...s].map(c => c.charCodeAt(0))));
+  const derCtx  = (n,c)=> derTag(0xa0 | n, c);
+  const derInt  = b  => { const a=[...b]; if(a[0]&0x80) a.unshift(0); return derTag(0x02,new Uint8Array(a)); };
+  const derUTC  = d  => {
+    const p = n => n.toString().padStart(2,'0');
+    const s = p(d.getUTCFullYear()%100)+p(d.getUTCMonth()+1)+p(d.getUTCDate())+
+              p(d.getUTCHours())+p(d.getUTCMinutes())+p(d.getUTCSeconds())+'Z';
+    return derTag(0x17, new Uint8Array([...s].map(c => c.charCodeAt(0))));
+  };
+  const cat = (...arrs) => {
+    const total = arrs.reduce((n,a) => n + a.length, 0);
+    const out = new Uint8Array(total); let off = 0;
+    arrs.forEach(a => { out.set(a, off); off += a.length; });
+    return out;
+  };
+
+  const OID_SHA256RSA = '2a864886f70d01010b';
+  const OID_RSA       = '2a864886f70d010101';
+  const OID_CN        = '550403';
+
+  async function buildSelfSignedCert(privateKey, spkiDer, cn) {
+    const sigAlg  = derSeq(cat(derOid(OID_SHA256RSA), derNull()));
+    const name    = derSeq(derSet(derSeq(cat(derOid(OID_CN), derPrint(cn)))));
+    const now     = new Date();
+    const expiry  = new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000);
+    const validity= derSeq(cat(derUTC(now), derUTC(expiry)));
+    const version = derCtx(0, new Uint8Array([0x02, 0x01, 0x02])); // v3
+    const serial  = derInt(new Uint8Array([0x01]));
+    const spki    = new Uint8Array(spkiDer);
+
+    const tbs = derSeq(cat(version, serial, sigAlg, name, validity, name, spki));
+
+    const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, tbs);
+    const cert   = derSeq(cat(tbs, sigAlg, derBits(new Uint8Array(sigBuf))));
+    return cert;
+  }
+
+  function ab2pem(label, buf) {
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const lines = b64.match(/.{1,64}/g).join('\n');
+    return `-----BEGIN ${label}-----\n${lines}\n-----END ${label}-----\n`;
+  }
+
+  async function generateDemoKeys() {
+    const btn = document.getElementById('genBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating\u2026';
+
+    try {
+      const kp = await crypto.subtle.generateKey(
+        { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+        true, ['sign', 'verify']
+      );
+
+      const [pkcs8, spki] = await Promise.all([
+        crypto.subtle.exportKey('pkcs8', kp.privateKey),
+        crypto.subtle.exportKey('spki',  kp.publicKey),
+      ]);
+
+      const certDer = await buildSelfSignedCert(kp.privateKey, spki, 'Demo TPP (Berlin Group)');
+
+      const pkPem   = ab2pem('PRIVATE KEY', pkcs8);
+      const certPem = ab2pem('CERTIFICATE', certDer);
+
+      document.getElementById('pk-text').value   = pkPem;
+      document.getElementById('cert-text').value = certPem;
+      setPem('pk',   pkPem);
+      setPem('cert', certPem);
+    } catch(e) {
+      alert('Key generation failed: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Regenerate demo keys';
+  }
+
+  function copyCurl() {
+    const raw = document.getElementById('curlOut').textContent;
+    navigator.clipboard.writeText(raw).then(() => {
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  }
+</script>
+</body>
+</html>
